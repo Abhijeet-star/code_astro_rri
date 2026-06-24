@@ -11,7 +11,6 @@ theta_res = 1.0
 theta_array = np.arange(-90, 90 + theta_res, theta_res)
 theta_array = np.round(theta_array, 2) 
 phi_array = np.arange(0, 360 + phi_res, phi_res)
-tsky   = np.zeros((npix, len(freq)))
 
 
 def find_nearest(array, value):
@@ -20,18 +19,45 @@ def find_nearest(array, value):
     return array[idx]
 
 
+def inside_rectangle_np(points, rect_bottom_left, rect_top_right, include_boundary=True):
+    x1, y1 = rect_bottom_left
+    x2, y2 = rect_top_right
+    xmin, xmax = min(x1, x2), max(x1, x2)
+    ymin, ymax = min(y1, y2), max(y1, y2)
+
+    px, py = points[:, 0], points[:, 1]
+    if include_boundary:
+        mask = (xmin <= px) & (px <= xmax) & (ymin <= py) & (py <= ymax)
+    else:
+        mask = (xmin < px) & (px < xmax) & (ymin < py) & (py < ymax)
+    return mask
+
+# param_obs = {'file': file,\
+#             'time': obstimes,\
+#             'chosen_frequency': chosen_frequency,\
+#             'site_latitude': SITE_LATITUDE,\
+#             'site_longitude': SITE_LONGITUDE,\
+#             'elevation': ELEVATION,\
+#             'nside': nside,\
+#             'l':lmax,\
+#             'b':bmax}
+
 class GalaxyElimination(object):
-    def __init__(self, file, time, chosen_frequency, site_latitude, site_longitude, elevation, nside, l, b, radius):
-        self.file = file
-        self.time = time  # array of obstimes
-        self.chosen_frequency = chosen_frequency
-        self.site_latitude = site_latitude
-        self.site_longitude = site_longitude
-        self.elevation = elevation
-        self.nside = nside
-        self.l = l
-        self.b = b
-        self.radius = radius
+    # def __init__(self, file, time, chosen_frequency, site_latitude, site_longitude, elevation, nside, l, b, radius):
+    #     self.file = file
+    #     self.time = time  # array of obstimes
+    #     self.chosen_frequency = chosen_frequency
+    #     self.site_latitude = site_latitude
+    #     self.site_longitude = site_longitude
+    #     self.elevation = elevation
+    #     self.nside = nside
+    #     self.l = l
+    #     self.b = b
+    #     self.radius = radius # LATER
+    def __init__(self, **kwargs):
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
         
         self.coordinate_generation()
@@ -39,16 +65,22 @@ class GalaxyElimination(object):
         self.fixed_radius()
         self.read_beam()
 
+
     def read_beam(self):
         f = h5py.File(self.file, 'r')
         beam_3D = f['ancillary_prod']['beam'][()]
         freq = f['index_map']['frequency'][()]
+        LST = f['index_map']['LST'][()]
         chosen_freq_idx = np.where(freq==self.chosen_frequency)[0][0]
         beam_val = RegularGridInterpolator((theta_array, phi_array), beam_3D[chosen_freq_idx])
+        npix = hp.nside2npix(self.nside)
+        tsky = np.zeros((npix, len(freq)))
+
 
         self.beam_val = beam_val
         self.frequency = freq
-
+        self.lst = LST
+        self.tsky = tsky
 
     def coordinate_generation(self): 
         npix = hp.nside2npix(self.nside)
@@ -69,22 +101,6 @@ class GalaxyElimination(object):
         self.gc  = gc
         self.location = location
 
-
-
-    def inside_rectangle_np(points, rect_bottom_left, rect_top_right, include_boundary=True):
-        x1, y1 = rect_bottom_left
-        x2, y2 = rect_top_right
-        xmin, xmax = min(x1, x2), max(x1, x2)
-        ymin, ymax = min(y1, y2), max(y1, y2)
-
-        px, py = points[:, 0], points[:, 1]
-        if include_boundary:
-            mask = (xmin <= px) & (px <= xmax) & (ymin <= py) & (py <= ymax)
-        else:
-            mask = (xmin < px) & (px < xmax) & (ymin < py) & (py < ymax)
-        return mask
-    
-
     # l = 45
     # b = 10
 
@@ -93,13 +109,11 @@ class GalaxyElimination(object):
 
     # lb = np.stack((lon,lat), axis=1)
 
-    def fixed_radius(self, tt):
-        # mn = lss.LunarTopo(obstime=obstimes[tt], location=location)
-        # trans_local = gc.transform_to(mn)
-        trans_local             = self.gc.transform_to(AltAz(obstime=tt, location=self.location))
-        az, alt                     = trans_local.az.degree, trans_local.alt.degree
-        az, alt     = trans_local.az.degree, trans_local.alt.degree
-        beam_gen = np.zeros_like(tsky)
+    def fixed_radius(self):
+
+        trans_local             = self.gc.transform_to(AltAz(obstime=self.time[int(len(self.lst)/2)], location=self.location))
+        az, alt                 = trans_local.az.degree, trans_local.alt.degree
+        beam_gen = np.zeros_like(self.tsky)
 
         rogue_phi  = []
 
@@ -120,7 +134,8 @@ class GalaxyElimination(object):
         vec_c  = hp.ang2vec(theta_c, phi_c)
         vec_hf = hp.ang2vec(theta_hf, phi_hf)
         radius = np.arccos(np.clip(np.dot(vec_c, vec_hf), -1.0, 1.0))
-        return radius
+        
+        self.radius = radius
     
 
     def time_elimination(self):
@@ -132,7 +147,7 @@ class GalaxyElimination(object):
             trans_local = self.gc.transform_to(AltAz(obstime=self.time[ii], location=self.location))
             az, alt     = trans_local.az.degree, trans_local.alt.degree
             ind_below_horizon       = alt < 0
-            beam_gen = np.zeros_like(tsky)
+            beam_gen = np.zeros_like(self.tsky)
 
             rogue_phi  = []
 
@@ -153,8 +168,9 @@ class GalaxyElimination(object):
             # vec_c  = hp.ang2vec(theta_c, phi_c)
             # vec_hf = hp.ang2vec(theta_hf, phi_hf)
             # radius = np.arccos(np.clip(np.dot(vec_c, vec_hf), -1.0, 1.0))
-            radius = fixed_radius(int(len(LST)/2))
-
+            # radius = self.fixed_radius(int(len(self.lst)/2))
+            
+            radius = self.radius
             npts = 1000
             phi = np.linspace(0, 2*np.pi, npts)
 
@@ -180,9 +196,11 @@ class GalaxyElimination(object):
             else:
                 good_timestamps.append(self.time[ii])
             
-            msk_tstps = np.array(masked_timestamps)      # Has Galaxy Coverage
+            # msk_tstps = np.array(masked_timestamps)      # Has Galaxy Coverage
             gd_tstps  = np.array(good_timestamps)        # Galaxy is eliminated
-            radius_all.append(radius)
+            # radius_all.append(radius)
 
-        rad_arr = np.array(radius_all)
+        # rad_arr = np.array(radius_all)
+
+        return gd_tstps
 
