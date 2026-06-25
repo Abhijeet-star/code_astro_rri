@@ -10,7 +10,7 @@ phi_res   = 1.0
 theta_res = 1.0
 theta_array = np.arange(-90, 90 + theta_res, theta_res)
 theta_array = np.round(theta_array, 2) 
-phi_array = np.arange(0, 360 + phi_res, phi_res)
+phi_array = np.arange(0, 360, phi_res)
 
 
 def find_nearest(array, value):
@@ -62,8 +62,9 @@ class GalaxyElimination(object):
         
         self.coordinate_generation()
         self.set_location()
-        self.fixed_radius()
         self.read_beam()
+        self.fixed_radius()
+
 
 
     def read_beam(self):
