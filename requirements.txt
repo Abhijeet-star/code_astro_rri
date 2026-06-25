@@ -1,0 +1,5 @@
+numpy
+astropy
+healpy
+scipy
+h5py
