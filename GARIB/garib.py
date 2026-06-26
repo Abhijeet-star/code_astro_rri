@@ -167,6 +167,9 @@ class GalaxyElimination(object):
 
         This function eliminates the times of observations where the beam crosses the galaxy.
         
+        Args:
+        Obstimes (list) : Times of observation
+        
         
         """
         masked_timestamps = []

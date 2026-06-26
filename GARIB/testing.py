@@ -5,21 +5,21 @@ import healpy as hp
 import h5py
 from scipy.interpolate import RegularGridInterpolator
 from astropy.time import Time, TimeDelta
-from garibe import GalaxyElimination
+from garib import GalaxyElimination
 
-file = "DIPOLE_500times_SMOOTH.h5"
+file = "SINESQ_500times_EARTH_jun26.h5"
 
 SITE_LATITUDE       = 32.81444444 #/* +32.77944444   deg for Hanle */ 
 SITE_LONGITUDE      = 78.85555556 #/* 78.96416667 deg for Hanle */
-ELEVATION = 4500
+ELEVATION           = 4500
 
 dt = TimeDelta(np.linspace(0.,24.*3600, 500), format='sec') #Will NOT take ~5 min
 obstimes = Time('2022-10-15 00:00:00') + dt
 
-chosen_frequency = 30
+chosen_frequency = 65
 nside = 16
-lmax = 45
-bmax = 10
+lmax  = 45
+bmax  = 10
 
 param_obs = {'file': file,\
             'time': obstimes,\
@@ -31,7 +31,7 @@ param_obs = {'file': file,\
             'l':lmax,\
             'b':bmax}
 
-# Galaxy Avoidance for RadIo antenna BEams: GARIBE
+# Galaxy Avoidance for RadIo antenna Beams: GARIB
 
 GE = GalaxyElimination(**param_obs)
 GE.time_elimination()
