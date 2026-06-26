@@ -41,10 +41,9 @@ class GalaxyElimination(object):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        
+        self.read_beam()      
         self.coordinate_generation()
         self.set_location()
-        self.read_beam()
         self.fixed_radius()
 
 
