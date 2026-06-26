@@ -4,7 +4,6 @@ This package is useful for radio astronomy experiments where you need to select/
 
 ## Installation
 
-'''
+```
 pip install garib
-
-'''
+```
