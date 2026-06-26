@@ -148,7 +148,7 @@ class GalaxyElimination(object):
             if az_value > phi_array.max():
                 rogue_phi.append(az_value)
                 az_value = 360 - az_value
-            beam_gen[iangle,0] = self.beam_val([alt_value, az_value])
+            beam_gen[iangle,0] = self.beam_val([alt_value, az_value])[0]
 
         hf_bm = find_nearest(beam_gen[:,0], 0.5)
         idx_hf = np.where(beam_gen[:,0] == hf_bm)
